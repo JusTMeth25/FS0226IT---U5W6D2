@@ -4,12 +4,15 @@ import com.example.demo.dto.ApiError;
 import com.example.demo.exception.BadRequestException;
 import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
@@ -38,7 +41,26 @@ public class ApiExceptionHandler {
 		return build(HttpStatus.BAD_REQUEST, message);
 	}
 
+	/**
+	 * Anything else. Spring's own web exceptions (404 on an unknown path, 405, missing
+	 * parameters) keep their status; the rest is a bug: the stack trace goes to the log
+	 * and the client gets a generic 500.
+	 */
+	@ExceptionHandler(Exception.class)
+	public ResponseEntity<ApiError> handleUnexpected(Exception exception) {
+		if (exception instanceof ErrorResponse errorResponse) {
+			HttpStatus status = HttpStatus.resolve(errorResponse.getStatusCode().value());
+			if (status != null) {
+				return build(status, exception.getMessage());
+			}
+		}
+		log.error("Unhandled exception", exception);
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+				.body(ApiError.of(500, "Internal Server Error", "Errore interno del server"));
+	}
+
 	private ResponseEntity<ApiError> build(HttpStatus status, String message) {
+		log.warn("{} {}: {}", status.value(), status.getReasonPhrase(), message);
 		return ResponseEntity.status(status)
 				.body(ApiError.of(status.value(), status.getReasonPhrase(), message));
 	}

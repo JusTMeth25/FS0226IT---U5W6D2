@@ -77,6 +77,19 @@ Close the two windows to stop the servers.
 
 3. Open <http://localhost:5173>.
 
+## Log agent
+
+`.claude/agents/log-agent.md` is a Claude Code subagent that works on `BE/logs/`
+(see [Logging](BE/README.md#logging)). Ask Claude Code, for example:
+
+- `use log-agent: error report for today`
+- `use log-agent: chat usage statistics`
+- `use log-agent: what happened to user mario in the last hour`
+- `use log-agent: log maintenance`
+
+It writes reports to `BE/logs/reports/` and one line per run to `BE/logs/agent.log`.
+It never edits source code and asks before deleting any file.
+
 ## Note
 
 CSRF protection is disabled in this build, which is acceptable for a local exercise only.

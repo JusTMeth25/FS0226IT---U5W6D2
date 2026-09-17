@@ -119,6 +119,29 @@ when their last session closes, so several open tabs behave correctly.
    offline, `convertAndSendToUser` finds no session and does nothing — the row stays in
    the database and shows up on the next history request.
 
+## Logging
+
+The console stays plain text; the file `BE/logs/app.log` gets the same events as JSON,
+one per line (Spring Boot structured logging, `logstash` format). Files roll at 10MB and
+are kept for 14 days. `logs/` is git-ignored.
+
+- `ApiExceptionHandler` logs 4xx answers at `WARN`. Any unexpected exception is logged at
+  `ERROR` with its stack trace, and the client gets a generic 500.
+- `ChatSocketController` logs rejected WebSocket messages at `WARN`.
+- `AuditLogger` writes chat events on the `AUDIT` logger, with an `event` field and
+  filterable key-value fields:
+
+  | event | fields |
+  |---|---|
+  | `LOGIN_OK`, `LOGOUT` | `username` |
+  | `LOGIN_FAIL` (WARN) | `username` as typed |
+  | `WS_CONNECT` | `username`, `sessionId` |
+  | `WS_DISCONNECT` | `username`, `sessionId`, `wentOffline` |
+  | `MSG_SENT` | `messageId`, `sender`, `recipient` |
+  | `MSG_DELIVERED`, `MSG_READ` | `messageIds`, `count`, `sender`, `recipient` |
+
+Only metadata is logged: never message content, never passwords.
+
 ## Security notes
 
 - Authentication is session based, with BCrypt password hashing.

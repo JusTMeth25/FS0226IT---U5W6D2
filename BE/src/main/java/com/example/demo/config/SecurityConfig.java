@@ -2,6 +2,7 @@ package com.example.demo.config;
 
 import com.example.demo.dto.ApiError;
 import com.example.demo.service.AppUserService;
+import com.example.demo.service.AuditLogger;
 import tools.jackson.databind.json.JsonMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -25,6 +26,7 @@ public class SecurityConfig {
 
 	private final AppUserService userService;
 	private final JsonMapper jsonMapper;
+	private final AuditLogger audit;
 
 	@Value("${app.cors.allowed-origin}")
 	private String allowedOrigin;
@@ -41,16 +43,24 @@ public class SecurityConfig {
 						.anyRequest().authenticated())
 				.formLogin(form -> form
 						.loginProcessingUrl("/api/auth/login")
-						.successHandler((request, response, authentication) ->
-								writeJson(response, HttpServletResponse.SC_OK,
-										userService.findByUsername(authentication.getName())))
-						.failureHandler((request, response, exception) ->
-								writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
-										ApiError.of(401, "Unauthorized", "Credenziali non valide"))))
+						.successHandler((request, response, authentication) -> {
+							audit.loginSuccess(authentication.getName());
+							writeJson(response, HttpServletResponse.SC_OK,
+									userService.findByUsername(authentication.getName()));
+						})
+						.failureHandler((request, response, exception) -> {
+							audit.loginFailure(request.getParameter("username"));
+							writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
+									ApiError.of(401, "Unauthorized", "Credenziali non valide"));
+						}))
 				.logout(logout -> logout
 						.logoutUrl("/api/auth/logout")
-						.logoutSuccessHandler((request, response, authentication) ->
-								response.setStatus(HttpServletResponse.SC_NO_CONTENT)))
+						.logoutSuccessHandler((request, response, authentication) -> {
+							if (authentication != null) {
+								audit.logout(authentication.getName());
+							}
+							response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+						}))
 				// Answer with 401 instead of redirecting a REST client to a login page.
 				.exceptionHandling(handling -> handling
 						.authenticationEntryPoint((request, response, exception) ->

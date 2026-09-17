@@ -3,6 +3,7 @@ package com.example.demo.web;
 import com.example.demo.dto.MessageDto;
 import com.example.demo.dto.ReceiptUpdate;
 import com.example.demo.model.MessageStatus;
+import com.example.demo.service.AuditLogger;
 import com.example.demo.service.ChatNotifier;
 import com.example.demo.service.ChatService;
 import java.security.Principal;
@@ -24,6 +25,7 @@ public class MessageController {
 
 	private final ChatService chatService;
 	private final ChatNotifier notifier;
+	private final AuditLogger audit;
 
 	/**
 	 * The stored history with one other user, in the order decided by the server.
@@ -47,7 +49,9 @@ public class MessageController {
 		if (ids.isEmpty()) {
 			return;
 		}
-		notifier.sendReceipt(username.trim().toLowerCase(), new ReceiptUpdate(
+		String author = username.trim().toLowerCase();
+		audit.messagesRead(ids, author, principal.getName());
+		notifier.sendReceipt(author, new ReceiptUpdate(
 				MessageStatus.READ,
 				principal.getName(),
 				ids,

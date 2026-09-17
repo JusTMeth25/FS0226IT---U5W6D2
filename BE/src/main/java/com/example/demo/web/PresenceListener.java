@@ -3,6 +3,7 @@ package com.example.demo.web;
 import com.example.demo.dto.PresenceEvent;
 import com.example.demo.dto.ReceiptUpdate;
 import com.example.demo.model.MessageStatus;
+import com.example.demo.service.AuditLogger;
 import com.example.demo.service.ChatNotifier;
 import com.example.demo.service.ChatService;
 import java.security.Principal;
@@ -27,6 +28,7 @@ public class PresenceListener {
 	private final ChatService chatService;
 	private final ChatNotifier notifier;
 	private final SimpUserRegistry userRegistry;
+	private final AuditLogger audit;
 
 	@EventListener
 	public void onConnected(SessionConnectedEvent event) {
@@ -35,11 +37,13 @@ public class PresenceListener {
 			return;
 		}
 		String username = principal.getName();
+		audit.connected(username, StompHeaderAccessor.wrap(event.getMessage()).getSessionId());
 
 		notifier.broadcastPresence(new PresenceEvent(username, true));
 
 		// Anything stored while this user was offline is delivered now.
 		for (ChatService.ReceiptBatch batch : chatService.markAllDelivered(username)) {
+			audit.messagesDelivered(batch.messageIds(), batch.senderUsername(), username);
 			notifier.sendReceipt(batch.senderUsername(), new ReceiptUpdate(
 					MessageStatus.DELIVERED,
 					username,
@@ -61,6 +65,7 @@ public class PresenceListener {
 		SimpUser user = userRegistry.getUser(username);
 		boolean stillConnected = user != null && user.getSessions().stream()
 				.anyMatch(session -> !session.getId().equals(closingSessionId));
+		audit.disconnected(username, closingSessionId, !stillConnected);
 
 		if (!stillConnected) {
 			notifier.broadcastPresence(new PresenceEvent(username, false));
